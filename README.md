@@ -1,7 +1,7 @@
 # 🚀 NOTLY — Sua Produtividade, Sua Soberania.
 
 <p align="center">
-  <img src="https://via.placeholder.com/150x150?text=NOTLY+LOGO" alt="NOTLY Logo" width="120" />
+  <img src="https://i.pinimg.com/736x/e2/f1/1e/e2f11ecc97c41214c8cc0814cb82307f.jpg" alt="NOTLY Logo" width="120" />
 </p>
 
 <p align="center">
@@ -107,5 +107,5 @@ Este projeto está sob a licença [MIT](LICENSE).
 ---
 
 <p align="center">
-  Feito com ❤️ por [Seu Nome/Organização]
+  Feito com ❤️ por Richards França
 </p>
