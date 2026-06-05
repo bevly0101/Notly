@@ -94,12 +94,18 @@ export async function pullChanges(
 
   const onlineWorkspaces = await getOnlineWorkspaceIds(db);
 
-  // Build pageId → workspaceId map from local data
+  // Build pageId → workspaceId map from local data + incoming cloud pages
   const pageWsMap = new Map<string, string>();
   try {
     const allPages = await db.pages.find().exec();
     for (const p of allPages) {
       pageWsMap.set(p.id, p.workspaceId);
+    }
+    // Also add cloud pages that will be processed in this pull cycle
+    if (result.pages) {
+      for (const cp of result.pages) {
+        pageWsMap.set(cp.id as string, cp.workspace_id as string);
+      }
     }
   } catch {
     /* ignore */
@@ -127,7 +133,13 @@ export async function pullChanges(
         if (table === "blocks") {
           const pageId = cloudDoc.page_id as string;
           const wsId = pageWsMap.get(pageId);
-          if (!wsId || !onlineWorkspaces.has(wsId)) continue;
+          if (!wsId || !onlineWorkspaces.has(wsId)) {
+            // If the page is also being pulled, look up its workspace_id from the cloud pages
+            const cloudPage = result.pages?.find((p) => p.id === pageId);
+            const resolvedWs = cloudPage ? (cloudPage.workspace_id as string) : undefined;
+            if (!resolvedWs || !onlineWorkspaces.has(resolvedWs)) continue;
+            pageWsMap.set(pageId, resolvedWs);
+          }
         }
 
         const rid = cloudDoc.id as string;
