@@ -1,6 +1,7 @@
 import { createRxDatabase, addRxPlugin, type RxDatabase } from "rxdb/plugins/core";
 import { RxDBDevModePlugin } from "rxdb/plugins/dev-mode";
 import { RxDBMigrationSchemaPlugin } from "rxdb/plugins/migration-schema";
+import { RxDBQueryBuilderPlugin } from "rxdb/plugins/query-builder";
 import { getRxStorageDexie } from "rxdb/plugins/storage-dexie";
 import { getRxStorageMemory } from "rxdb/plugins/storage-memory";
 import { wrappedValidateAjvStorage } from "rxdb/plugins/validate-ajv";
@@ -12,6 +13,7 @@ import type { WorkspaceCollection, PageCollection, BlockCollection, ApiKeyCollec
 
 addRxPlugin(RxDBDevModePlugin);
 addRxPlugin(RxDBMigrationSchemaPlugin);
+addRxPlugin(RxDBQueryBuilderPlugin);
 
 type NotlyCollections = {
   workspaces: WorkspaceCollection;
