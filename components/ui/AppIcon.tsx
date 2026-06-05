@@ -1,5 +1,10 @@
-import { Icon } from "@iconify/react";
+import { Icon, addCollection } from "@iconify/react";
+import basilIcons from "@iconify-json/basil/icons.json";
 import { getIconClass } from "@/lib/icons";
+
+if (typeof window !== "undefined") {
+  addCollection(basilIcons);
+}
 
 type Props = {
   icon: string | null | undefined;

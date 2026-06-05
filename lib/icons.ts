@@ -204,3 +204,5 @@ export function getIconClass(icon: string | null | undefined): string {
   if (isEmoji(icon)) return icon;
   return `basil:${icon}`;
 }
+
+

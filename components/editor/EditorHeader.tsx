@@ -7,12 +7,28 @@ import { useLayout } from "@/lib/contexts/LayoutContext";
 import { PAGE_ICONS } from "@/lib/icons";
 import AppIcon from "@/components/ui/AppIcon";
 import Link from "next/link";
+import type { PageDocType } from "@/lib/db/types";
+
+function getAncestors(pages: PageDocType[], pageId: string | null): PageDocType[] {
+  if (!pageId) return [];
+  const map = new Map(pages.map((p) => [p.id, p]));
+  const chain: PageDocType[] = [];
+  let id: string | null = pageId;
+  while (id) {
+    const p = map.get(id);
+    if (!p) break;
+    chain.unshift(p);
+    id = p.parentId;
+  }
+  return chain;
+}
 
 export default function EditorHeader() {
   const {
     pages,
     workspace,
     currentPageId,
+    setCurrentPage,
     isMemory,
     updatePageProp,
     deletePageById,
@@ -21,9 +37,11 @@ export default function EditorHeader() {
   const { setSidebarOpen, setPanelOpen } = useLayout();
   const [menuOpen, setMenuOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const [wsNavOpen, setWsNavOpen] = useState(false);
   const iconPickerRef = useRef<HTMLDivElement>(null);
 
   const currentPage = pages.find((p) => p.id === currentPageId) ?? null;
+  const breadcrumbs = getAncestors(pages, currentPageId);
 
   async function handleToggleFav() {
     if (!currentPage) return;
@@ -79,25 +97,66 @@ export default function EditorHeader() {
         </button>
 
         <div className="flex items-center gap-2 text-xs text-on-surface-variant font-mono tracking-wider truncate">
-          <Link href="/" className="hover:text-primary transition-colors hidden sm:inline">
+          <Link href="/" className="hover:text-primary transition-colors hidden sm:inline flex-shrink-0">
             NOTLY
           </Link>
           {workspace && (
             <>
-              <span className="text-outline hidden sm:inline">/</span>
-              <span className="text-on-surface truncate max-w-[120px] sm:max-w-none">
-                {workspace.name}
-              </span>
+              <span className="text-outline hidden sm:inline flex-shrink-0">/</span>
+              <div className="relative">
+                <button
+                  onClick={() => setWsNavOpen(!wsNavOpen)}
+                  className="text-on-surface truncate max-w-[120px] sm:max-w-[150px] hover:text-primary transition-colors cursor-pointer text-left"
+                >
+                  {workspace.name}
+                </button>
+                {wsNavOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setWsNavOpen(false)}
+                    />
+                    <div className="absolute left-0 top-full mt-1 z-50 w-60 rounded-lg border border-outline-variant bg-surface-container-lowest shadow-xl py-1 max-h-[60vh] overflow-y-auto">
+                      <div className="px-3 py-2 text-xs text-on-surface-variant border-b border-outline-variant">
+                        Navegar para...
+                      </div>
+                      {pages
+                        .filter((p) => !p.parentId)
+                        .map((root) => (
+                          <WsNavItem
+                            key={root.id}
+                            page={root}
+                            pages={pages}
+                            activeId={currentPageId}
+                            onSelect={(id) => {
+                              setCurrentPage(id);
+                              setWsNavOpen(false);
+                            }}
+                          />
+                        ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </>
           )}
-          {currentPage && (
-            <>
-              <span className="text-outline">/</span>
-              <span className="text-on-surface truncate max-w-[120px] sm:max-w-[200px]">
-                {currentPage.title}
-              </span>
-            </>
-          )}
+          {breadcrumbs.map((p) => (
+            <span key={p.id} className="flex items-center gap-2 min-w-0">
+              <span className="text-outline flex-shrink-0">/</span>
+              <button
+                onClick={() => {
+                  setCurrentPage(p.id);
+                }}
+                className={`truncate hover:text-primary transition-colors cursor-pointer text-left ${
+                  p.id === currentPageId
+                    ? "text-on-surface max-w-[120px] sm:max-w-[200px]"
+                    : "text-on-surface-variant max-w-[100px] sm:max-w-[150px]"
+                }`}
+              >
+                {p.title}
+              </button>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -222,5 +281,61 @@ export default function EditorHeader() {
         </div>
       </div>
     </header>
+  );
+}
+
+function WsNavItem({
+  page,
+  pages,
+  activeId,
+  onSelect,
+  depth = 0,
+}: {
+  page: PageDocType;
+  pages: PageDocType[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  depth?: number;
+}) {
+  const children = pages.filter((p) => p.parentId === page.id);
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div>
+      <button
+        className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors ${
+          page.id === activeId
+            ? "bg-accent/10 text-accent"
+            : "text-on-surface hover:bg-surface-container"
+        }`}
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
+        onClick={() => onSelect(page.id)}
+      >
+        {children.length > 0 && (
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="flex-shrink-0 text-on-surface-variant"
+          >
+            {expanded ? "▾" : "▸"}
+          </span>
+        )}
+        {children.length === 0 && <span className="w-3 flex-shrink-0" />}
+        <AppIcon icon={page.icon} size={14} />
+        <span className="truncate">{page.title}</span>
+      </button>
+      {expanded && children.map((child) => (
+        <WsNavItem
+          key={child.id}
+          page={child}
+          pages={pages}
+          activeId={activeId}
+          onSelect={onSelect}
+          depth={depth + 1}
+        />
+      ))}
+    </div>
   );
 }
