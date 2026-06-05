@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NotlyDatabase } from "@/lib/db/database";
-import type { SyncLogEntry, SyncCollection } from "./types";
+import type { SyncCollection } from "./types";
 
 const LS_LAST_SYNC = "notly_last_sync_at";
 
@@ -23,9 +23,9 @@ function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
 
-function mapSnapshotToRxDB(table: string, snapshot: Record<string, unknown>): Record<string, unknown> {
+function mapCloudDoc(table: string, doc: Record<string, unknown>): Record<string, unknown> {
   const mapped: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(snapshot)) {
+  for (const [key, value] of Object.entries(doc)) {
     if (key === "user_id" || key === "deleted_at" || key === "path") continue;
     const camel = snakeToCamel(key);
     mapped[camel] = value;
@@ -36,13 +36,18 @@ function mapSnapshotToRxDB(table: string, snapshot: Record<string, unknown>): Re
 }
 
 function getRxCollectionName(table: string): SyncCollection | null {
-  const map: Record<string, SyncCollection> = {
-    workspaces: "workspaces",
-    pages: "pages",
-    blocks: "blocks",
-  };
-  return map[table] ?? null;
+  if (table === "workspaces") return "workspaces";
+  if (table === "pages") return "pages";
+  if (table === "blocks") return "blocks";
+  return null;
 }
+
+type SyncPullResult = {
+  workspaces: Record<string, unknown>[];
+  pages: Record<string, unknown>[];
+  blocks: Record<string, unknown>[];
+  deleted: { table_name: string; record_id: string }[];
+};
 
 export async function pullChanges(
   supabase: SupabaseClient,
@@ -51,84 +56,83 @@ export async function pullChanges(
   const lastSync = getLastSyncTimestamp();
   const since = lastSync > 0 ? new Date(lastSync).toISOString() : "1970-01-01T00:00:00Z";
 
-  const { data, error } = await supabase
-    .from("sync_log")
-    .select("*")
-    .gt("created_at", since)
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.rpc("sync_pull", {
+    p_since: since,
+  });
 
   if (error) {
     console.error("[Sync] Pull error:", error.message);
     return 0;
   }
 
-  const entries = data as SyncLogEntry[];
-  if (entries.length === 0) return 0;
+  const result = data as unknown as SyncPullResult;
+  if (!result) return 0;
 
   let processed = 0;
 
-  for (const entry of entries) {
-    const collectionName = getRxCollectionName(entry.table_name);
+  // Process active documents
+  for (const [table, docs] of Object.entries(result) as [string, Record<string, unknown>[]][]) {
+    if (table === "deleted") continue;
+
+    const collectionName = getRxCollectionName(table);
     if (!collectionName) continue;
 
     const collection = db[collectionName];
     if (!collection) continue;
 
-    try {
-      const existing = await collection.findOne(entry.record_id).exec();
+    for (const cloudDoc of docs) {
+      try {
+        const rid = cloudDoc.id as string;
+        const existing = await collection.findOne(rid).exec();
 
-      switch (entry.action) {
-        case "create": {
-          if (existing) break;
-          const doc = mapSnapshotToRxDB(entry.table_name, entry.snapshot);
-          doc.id = entry.record_id;
-          await collection.insert(doc as never);
-          break;
-        }
-
-        case "update": {
-          if (!existing) {
-            const doc = mapSnapshotToRxDB(entry.table_name, entry.snapshot);
-            doc.id = entry.record_id;
-            await collection.insert(doc as never);
-            break;
-          }
-          const snapshotUpdatedAt = entry.snapshot.updated_at
-            ? new Date(entry.snapshot.updated_at as string).getTime()
+        if (existing) {
+          const cloudUpdated = cloudDoc.updated_at
+            ? new Date(cloudDoc.updated_at as string).getTime()
             : 0;
-          const localUpdatedAt = (existing as unknown as Record<string, unknown>).updatedAt as number || 0;
-          if (snapshotUpdatedAt > localUpdatedAt) {
-            const patch = mapSnapshotToRxDB(entry.table_name, entry.snapshot);
-            delete patch.id;
-            await existing.patch(patch);
-          }
-          break;
-        }
+          const localUpdated = (existing as unknown as { updatedAt: number }).updatedAt ?? 0;
 
-        case "soft_delete": {
-          if (existing) {
-            await existing.remove();
-          }
-          break;
-        }
+          if (cloudUpdated <= localUpdated) continue;
 
-        case "restore": {
-          if (existing) break;
-          const doc = mapSnapshotToRxDB(entry.table_name, entry.snapshot);
-          doc.id = entry.record_id;
+          const patch = mapCloudDoc(table, cloudDoc);
+          delete patch.id;
+          await existing.patch(patch);
+        } else {
+          const doc = mapCloudDoc(table, cloudDoc);
+          doc.id = rid;
           await collection.insert(doc as never);
-          break;
         }
-      }
 
-      processed++;
-    } catch (err) {
-      console.error(`[Sync] Pull error processing ${entry.table_name}/${entry.record_id}:`, err);
+        processed++;
+      } catch (err) {
+        console.error(`[Sync] Pull error processing ${table}/${cloudDoc.id}:`, err);
+      }
     }
   }
 
-  const latestTs = entries[entries.length - 1].created_at;
-  setLastSyncTimestamp(new Date(latestTs).getTime());
+  // Process deletions (soft delete na cloud)
+  if (result.deleted) {
+    for (const del of result.deleted) {
+      try {
+        const collectionName = getRxCollectionName(del.table_name);
+        if (!collectionName) continue;
+
+        const collection = db[collectionName];
+        if (!collection) continue;
+
+        const existing = await collection.findOne(del.record_id).exec();
+        if (existing) {
+          await existing.remove();
+          processed++;
+        }
+      } catch (err) {
+        console.error(`[Sync] Pull error processing deletion ${del.table_name}/${del.record_id}:`, err);
+      }
+    }
+  }
+
+  if (processed > 0) {
+    setLastSyncTimestamp(Date.now());
+  }
 
   return processed;
 }
