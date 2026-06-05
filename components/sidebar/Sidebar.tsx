@@ -223,9 +223,9 @@ function PageTree({
               e.stopPropagation();
               setMenuOpen(!menuOpen);
             }}
-            className="p-0.5 rounded text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-surface-container transition-all text-on-surface-variant hover:text-on-surface"
+            className="p-1 rounded text-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-surface-container transition-all text-on-surface-variant hover:text-on-surface"
           >
-            ⋯
+            <Icon icon="basil:more-outline" width={14} height={14} />
           </button>
           {menuOpen && (
             <>

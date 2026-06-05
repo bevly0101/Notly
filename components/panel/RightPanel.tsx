@@ -25,7 +25,7 @@ export default function RightPanel() {
   }
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-surface-container-low border-l border-outline-variant flex flex-col overflow-y-auto">
+    <aside className="w-64 h-full flex-shrink-0 bg-surface-container-low border-l border-outline-variant flex flex-col overflow-y-auto">
       <div className="flex items-center border-b border-outline-variant">
         <button
           onClick={() => setActiveTab("toc")}

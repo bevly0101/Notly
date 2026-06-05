@@ -55,7 +55,7 @@ function LayoutInner({ children }: Props) {
                 className="fixed inset-0 z-30 bg-black/40 lg:hidden"
                 onClick={() => setPanelOpen(false)}
               />
-              <aside className="fixed right-0 top-0 bottom-0 z-40 w-72 lg:hidden animate-slide-in-right">
+              <aside className="fixed right-0 top-0 bottom-0 z-40 w-64 lg:hidden animate-slide-in-right h-full">
                 <RightPanel />
               </aside>
             </>
