@@ -5,7 +5,7 @@ import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/contexts/AuthContext";
 import { createDatabase } from "@/lib/db";
-import { getAllWorkspaces, createWorkspace, deleteWorkspace } from "@/lib/db/repositories/workspace-repo";
+import { createWorkspace, deleteWorkspace } from "@/lib/db/repositories/workspace-repo";
 import { WORKSPACE_ICONS } from "@/lib/icons";
 import AppIcon from "@/components/ui/AppIcon";
 import type { WorkspaceDocType } from "@/lib/db/types";
@@ -21,18 +21,22 @@ export default function Home() {
   const [newIcon, setNewIcon] = useState("folder-outline");
 
   useEffect(() => {
-    async function load() {
-      try {
-        await createDatabase();
-        const ws = await getAllWorkspaces();
-        setWorkspaces(ws.map((w) => w.toMutableJSON()));
-      } catch (err) {
-        console.error("Failed to load workspaces:", err);
-      } finally {
+    let unsub: (() => void) | undefined;
+
+    async function subscribe() {
+      const db = await createDatabase();
+      const query = db.workspaces.find();
+
+      const sub = query.$.subscribe((docs) => {
+        setWorkspaces(docs.map((d) => d.toMutableJSON()));
         setLoading(false);
-      }
+      });
+
+      unsub = () => sub.unsubscribe();
     }
-    load();
+
+    subscribe();
+    return () => unsub?.();
   }, []);
 
   async function handleCreate() {
@@ -69,13 +73,20 @@ export default function Home() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
         <h1 className="text-xl font-bold text-primary tracking-tight">NOTLY</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90"
           >
             + Novo Workspace
           </button>
+          <Link
+            href="/settings"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+            title="Configurações"
+          >
+            <Icon icon="basil:settings-outline" width={18} height={18} />
+          </Link>
           {user ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-on-surface-variant hidden sm:inline">
