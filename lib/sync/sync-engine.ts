@@ -262,7 +262,6 @@ export class SyncEngine {
       };
 
       const insertSub = collection.insert$.subscribe(async (ev) => {
-        if (this._isPulling) return;
         const freshDoc = await collection.findOne(ev.documentId).exec();
         if (!freshDoc) return;
         const doc = freshDoc.toJSON();
@@ -272,7 +271,6 @@ export class SyncEngine {
       });
 
       const updateSub = collection.update$.subscribe(async (ev) => {
-        if (this._isPulling) return;
         const doc = await collection.findOne(ev.documentId).exec();
         if (!doc) return;
         const json = doc.toJSON();
@@ -282,7 +280,6 @@ export class SyncEngine {
       });
 
       const removeSub = collection.remove$.subscribe((ev) => {
-        if (this._isPulling) return;
         this.enqueue({ collection: name, operation: "delete", id: ev.documentId, doc: ev.previousData });
       });
 
@@ -339,11 +336,19 @@ export class SyncEngine {
 
     switch (change.operation) {
       case "create":
-        await this.pushCreate(change.collection, change.doc);
+      case "update": {
+        const col = this.db?.[change.collection] as
+          | { findOne: (id: string) => { exec: () => Promise<{ toJSON: () => Record<string, unknown> } | null> } }
+          | undefined;
+        const freshDoc = col ? await col.findOne(change.id).exec() : null;
+        const doc = freshDoc?.toJSON() ?? change.doc;
+        if (change.operation === "create") {
+          await this.pushCreate(change.collection, doc);
+        } else {
+          await this.pushUpdate(change.collection, doc);
+        }
         break;
-      case "update":
-        await this.pushUpdate(change.collection, change.doc);
-        break;
+      }
       case "delete":
         await this.pushDelete(change.collection, change.id);
         break;
