@@ -14,6 +14,7 @@ import { getWorkspaceById, createWorkspace, updateWorkspace } from "@/lib/db/rep
 import { getPagesByWorkspace, createPage, updatePage, deletePage } from "@/lib/db/repositories/page-repo";
 import { BlockRepo } from "@/lib/db";
 import { useSync } from "./SyncContext";
+import { syncEngine } from "@/lib/sync/sync-engine";
 
 type WorkspaceContextValue = {
   db: NotlyDatabase | null;
@@ -161,6 +162,8 @@ export function WorkspaceProvider({
     setWorkspace((prev) => (prev ? { ...prev, isOnline: newState } : prev));
     if (newState) {
       await syncWorkspace(workspace.id);
+    } else {
+      await syncEngine.refreshOnlineWorkspaces();
     }
   }, [workspace, db, syncWorkspace]);
 

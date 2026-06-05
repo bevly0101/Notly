@@ -190,9 +190,10 @@ export class SyncEngine {
       console.error(`[Sync] syncWorkspace ${workspaceId} failed:`, err);
       this.setStatus("error");
       return;
+    } finally {
+      await this.refreshOnlineWorkspaces();
     }
 
-    await this.refreshOnlineWorkspaces();
     this._lastSyncedAt = Date.now();
     this.setStatus("synced");
   }

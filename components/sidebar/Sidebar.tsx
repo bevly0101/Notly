@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Icon } from "@iconify/react";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 import { useLayout } from "@/lib/contexts/LayoutContext";
+import { useSync } from "@/lib/contexts/SyncContext";
 import type { PageDocType } from "@/lib/db/types";
 import AppIcon from "@/components/ui/AppIcon";
 import Link from "next/link";
@@ -13,7 +14,6 @@ export default function Sidebar() {
     workspace,
     pages,
     isReady,
-    isMemory,
     currentPageId,
     setCurrentPage,
     addNewPage,
@@ -21,6 +21,7 @@ export default function Sidebar() {
     deletePageById,
   } = useWorkspace();
   const { setSidebarOpen } = useLayout();
+  const { syncStatus, isEnabled } = useSync();
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState(false);
 
@@ -73,9 +74,55 @@ export default function Sidebar() {
   return (
     <aside className="w-[260px] h-full bg-surface-container-low border-r border-outline-variant flex flex-col overflow-y-auto transition-all duration-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
-        <h2 className="text-sm font-semibold text-primary truncate">
-          {workspace?.name ?? "NOTLY"}
-        </h2>
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-primary truncate">
+            {workspace?.name ?? "NOTLY"}
+          </h2>
+          {workspace && (
+            <span
+              className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                syncStatus === "syncing" || syncStatus === "initial-syncing"
+                  ? "bg-accent/15 text-accent"
+                  : workspace.isOnline && syncStatus === "synced"
+                    ? "bg-primary/10 text-primary"
+                    : workspace.isOnline && syncStatus === "error"
+                      ? "bg-error/10 text-error"
+                      : "bg-surface-container-high text-on-surface-variant"
+              }`}
+              title={
+                syncStatus === "syncing" || syncStatus === "initial-syncing"
+                  ? "A sincronizar..."
+                  : workspace.isOnline
+                    ? "Online"
+                    : "Offline"
+              }
+            >
+              {syncStatus === "syncing" || syncStatus === "initial-syncing" ? (
+                <>
+                  <span className="inline-block w-2 h-2 rounded-full bg-accent animate-pulse" />
+                  Sync
+                </>
+              ) : (
+                <Icon
+                  icon={
+                    workspace.isOnline
+                      ? "basil:cloud-outline"
+                      : "basil:cloud-slash-outline"
+                  }
+                  width={10}
+                  height={10}
+                />
+              )}
+              <span className="hidden sm:inline">
+                {syncStatus === "syncing" || syncStatus === "initial-syncing"
+                  ? ""
+                  : workspace.isOnline
+                    ? "Online"
+                    : "Offline"}
+              </span>
+            </span>
+          )}
+        </div>
         <button
           onClick={() => setCollapsed(true)}
           className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
@@ -138,9 +185,37 @@ export default function Sidebar() {
           <span>Configurações</span>
         </Link>
 
-        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-on-surface-variant">
-          <span className={`inline-block w-1.5 h-1.5 rounded-full ${isMemory ? "bg-secondary" : "bg-on-surface-variant"}`} />
-          {isMemory ? "Modo memória" : "Offline"}
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
+          {isEnabled ? (
+            <>
+              {syncStatus === "syncing" || syncStatus === "initial-syncing" ? (
+                <span className="flex items-center gap-1.5 text-accent">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  A sincronizar...
+                </span>
+              ) : syncStatus === "error" ? (
+                <span className="flex items-center gap-1.5 text-error">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-error" />
+                  Erro de sync
+                </span>
+              ) : syncStatus === "synced" ? (
+                <span className="flex items-center gap-1.5 text-primary">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+                  Sincronizado
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-on-surface-variant">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-on-surface-variant" />
+                  Sync inativo
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="flex items-center gap-1.5 text-on-surface-variant">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-on-surface-variant" />
+              Desconectado
+            </span>
+          )}
         </div>
       </div>
     </aside>
