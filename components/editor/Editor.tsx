@@ -4,13 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { getEditorExtensions } from "@/lib/editor/editor-config";
 import { SlashCommandExtension, type SlashCommandItem } from "@/lib/editor/slash-command";
+import type { PageReferenceAttrs } from "@/lib/editor/page-reference";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 import { BlockRepo } from "@/lib/db";
 import SlashCommandMenu from "./SlashCommandMenu";
 import "./editor-styles.css";
 
 export default function Editor() {
-  const { isReady, currentPageId, updatePageProp, addNewPage } = useWorkspace();
+  const { isReady, currentPageId, updatePageProp, addNewPage, setCurrentPage } = useWorkspace();
   const [slashSearch, setSlashSearch] = useState("");
   const [slashOpen, setSlashOpen] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -47,16 +48,7 @@ export default function Editor() {
   }, []);
 
   const handleSlashSelect = useCallback(
-    (item: SlashCommandItem) => {
-      if (item.isPageAction && item.title === "Sub-página") {
-        const pid = pageIdRef.current;
-        if (pid) {
-          addNewPage(pid);
-        }
-        handleSlashClose();
-        return;
-      }
-
+    async (item: SlashCommandItem) => {
       const ed = editorRef.current;
       if (ed && slashCharPos.current !== null) {
         const { from } = ed.state.selection;
@@ -76,6 +68,26 @@ export default function Editor() {
             })
             .run();
         }
+      }
+
+      if (item.isPageAction && item.title === "Sub-página") {
+        const pid = pageIdRef.current;
+        if (pid) {
+          const newPage = await addNewPage(pid, false);
+          if (newPage && ed) {
+            const attrs: PageReferenceAttrs = {
+              pageId: newPage.id,
+              title: newPage.title,
+              icon: newPage.icon,
+            };
+            ed.chain().focus().insertPageReference(attrs).run();
+          }
+        }
+        handleSlashClose();
+        return;
+      }
+
+      if (ed) {
         item.command(ed);
       }
       handleSlashClose();
@@ -165,6 +177,16 @@ export default function Editor() {
     editorProps: {
       attributes: {
         class: "prose prose-invert max-w-none focus:outline-none",
+      },
+      handleClickOn: (_view, _pos, node) => {
+        if (node.type.name === "pageReference") {
+          const pageId = node.attrs.pageId as string | null;
+          if (pageId) {
+            setCurrentPage(pageId);
+          }
+          return true;
+        }
+        return false;
       },
     },
   });

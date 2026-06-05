@@ -47,7 +47,7 @@ export default function Sidebar() {
 
   if (!isReady) {
     return (
-      <aside className="w-[260px] bg-surface-container-low border-r border-outline-variant flex flex-col items-center pt-2 transition-all duration-200">
+      <aside className="w-[260px] h-full bg-surface-container-low border-r border-outline-variant flex flex-col items-center pt-2 transition-all duration-200">
         <div className="flex items-center justify-center h-full text-on-surface-variant text-sm">
           A inicializar...
         </div>
@@ -57,7 +57,7 @@ export default function Sidebar() {
 
   if (collapsed) {
     return (
-      <aside className="w-10 bg-surface-container-low border-r border-outline-variant flex flex-col items-center pt-2 transition-all duration-200">
+      <aside className="w-10 h-full bg-surface-container-low border-r border-outline-variant flex flex-col items-center pt-2 transition-all duration-200">
         <button
           onClick={() => setCollapsed(false)}
           className="p-2 rounded-md text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
@@ -70,7 +70,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-[260px] bg-surface-container-low border-r border-outline-variant flex flex-col overflow-y-auto transition-all duration-200">
+    <aside className="w-[260px] h-full bg-surface-container-low border-r border-outline-variant flex flex-col overflow-y-auto transition-all duration-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant">
         <h2 className="text-sm font-semibold text-primary truncate">
           {workspace?.name ?? "NOTLY"}
@@ -223,7 +223,7 @@ function PageTree({
               e.stopPropagation();
               setMenuOpen(!menuOpen);
             }}
-            className="p-0.5 rounded text-xs opacity-0 group-hover:opacity-100 hover:bg-surface-container transition-all text-on-surface-variant hover:text-on-surface"
+            className="p-0.5 rounded text-xs opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-surface-container transition-all text-on-surface-variant hover:text-on-surface"
           >
             ⋯
           </button>

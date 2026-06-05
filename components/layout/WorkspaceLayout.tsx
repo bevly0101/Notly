@@ -13,7 +13,7 @@ type Props = {
 
 function LayoutInner({ children }: Props) {
   const { currentPageId } = useWorkspace();
-  const { sidebarOpen, setSidebarOpen, panelOpen } = useLayout();
+  const { sidebarOpen, setSidebarOpen, panelOpen, setPanelOpen } = useLayout();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -29,7 +29,7 @@ function LayoutInner({ children }: Props) {
             className="fixed inset-0 z-30 bg-black/40 md:hidden"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="fixed left-0 top-0 bottom-0 z-40 md:hidden animate-slide-in">
+          <aside className="fixed left-0 top-0 bottom-0 z-40 md:hidden animate-slide-in h-full">
             <Sidebar />
           </aside>
         </>
@@ -53,7 +53,7 @@ function LayoutInner({ children }: Props) {
             <>
               <div
                 className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-                onClick={() => {}}
+                onClick={() => setPanelOpen(false)}
               />
               <aside className="fixed right-0 top-0 bottom-0 z-40 w-72 lg:hidden animate-slide-in-right">
                 <RightPanel />

@@ -6,6 +6,7 @@ import Link from "@tiptap/extension-link";
 import Highlight from "@tiptap/extension-highlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
+import { PageReference } from "./page-reference";
 
 const lowlight = createLowlight(common);
 
@@ -36,5 +37,6 @@ export function getEditorExtensions() {
     CodeBlockLowlight.configure({
       lowlight,
     }),
+    PageReference,
   ];
 }

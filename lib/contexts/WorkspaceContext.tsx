@@ -22,7 +22,7 @@ type WorkspaceContextValue = {
   isMemory: boolean;
   currentPageId: string | null;
   setCurrentPage: (pageId: string) => void;
-  addNewPage: (parentId?: string) => Promise<PageDocType | null>;
+  addNewPage: (parentId?: string, navigate?: boolean) => Promise<PageDocType | null>;
   updatePageProp: (pageId: string, props: Partial<PageDocType>) => Promise<void>;
   deletePageById: (pageId: string) => Promise<void>;
 };
@@ -111,7 +111,7 @@ export function WorkspaceProvider({
     setCurrentPageId(pageId);
   }, []);
 
-  const addNewPage = useCallback(async (parentId?: string) => {
+  const addNewPage = useCallback(async (parentId?: string, navigate: boolean = true) => {
     if (!workspace) return null;
     const parentPages = pages.filter((p) => p.parentId === (parentId ?? null));
     const newPage = await createPage({
@@ -123,7 +123,9 @@ export function WorkspaceProvider({
     });
     const pageJson = newPage.toMutableJSON();
     setPages((prev) => [...prev, pageJson]);
-    setCurrentPageId(pageJson.id);
+    if (navigate) {
+      setCurrentPageId(pageJson.id);
+    }
 
     await BlockRepo.createBlock({
       pageId: pageJson.id,
