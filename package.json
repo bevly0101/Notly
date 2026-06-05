@@ -14,6 +14,7 @@
   "dependencies": {
     "@iconify-json/basil": "^1.2.4",
     "@iconify/react": "^6.0.2",
+    "@supabase/supabase-js": "^2.107.0",
     "@tiptap/extension-bubble-menu": "^3.25.0",
     "@tiptap/extension-character-count": "^3.25.0",
     "@tiptap/extension-code-block-lowlight": "^3.25.0",

@@ -3,13 +3,16 @@
 import { useEffect, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/contexts/AuthContext";
 import { createDatabase } from "@/lib/db";
 import { getAllWorkspaces, createWorkspace, deleteWorkspace } from "@/lib/db/repositories/workspace-repo";
 import { WORKSPACE_ICONS } from "@/lib/icons";
 import AppIcon from "@/components/ui/AppIcon";
 import type { WorkspaceDocType } from "@/lib/db/types";
+import Link from "next/link";
 
 export default function Home() {
+  const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<WorkspaceDocType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +57,7 @@ export default function Home() {
     }
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-on-surface-variant text-sm">A carregar...</div>
@@ -66,12 +69,34 @@ export default function Home() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
         <h1 className="text-xl font-bold text-primary tracking-tight">NOTLY</h1>
-        <button
-          onClick={() => setShowModal(true)}
-          className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90"
-        >
-          + Novo Workspace
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowModal(true)}
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary transition-opacity hover:opacity-90"
+          >
+            + Novo Workspace
+          </button>
+          {user ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-on-surface-variant hidden sm:inline">
+                {user.email}
+              </span>
+              <button
+                onClick={signOut}
+                className="px-3 py-1.5 text-xs rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error transition-colors"
+              >
+                Sair
+              </button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="px-3 py-1.5 text-xs rounded-lg border border-outline-variant text-on-surface hover:bg-surface-container transition-colors"
+            >
+              Entrar
+            </Link>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 max-w-3xl mx-auto w-full px-6 py-10">
