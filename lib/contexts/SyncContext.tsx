@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import { syncEngine } from "@/lib/sync/sync-engine";
 import { supabase } from "@/lib/supabase/client";
@@ -55,6 +55,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [isEnabled, setIsEnabled] = useState(loadSyncEnabled);
   const [initialSyncProgress, setInitialSyncProgress] = useState<InitialSyncProgress | null>(null);
+  const autoStarted = useRef(false);
 
   useEffect(() => {
     const unsubStatus = syncEngine.onStatusChange(setSyncStatus);
@@ -64,6 +65,25 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       unsubProgress();
     };
   }, []);
+
+  // Auto-start sync after login if it was enabled before page refresh
+  useEffect(() => {
+    if (user && isEnabled && !autoStarted.current && !syncEngine.isRunning) {
+      autoStarted.current = true;
+      (async () => {
+        try {
+          const db = await waitForDatabase();
+          syncEngine.setDatabase(db);
+          syncEngine.setSupabase(supabase);
+          await syncEngine.start();
+          setLastSyncedAt(Date.now());
+        } catch (err) {
+          console.error("[Sync] Auto-start failed:", err);
+          autoStarted.current = false;
+        }
+      })();
+    }
+  }, [user, isEnabled]);
 
   const enableSync = useCallback(async () => {
     if (!user) return;
@@ -84,6 +104,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     setIsEnabled(false);
     saveSyncEnabled(false);
     setInitialSyncProgress(null);
+    autoStarted.current = false;
   }, []);
 
   const syncNow = useCallback(async () => {
@@ -92,9 +113,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const syncWorkspace = useCallback(async (workspaceId: string) => {
+    if (!syncEngine.isRunning) {
+      await enableSync();
+    }
     await syncEngine.syncWorkspace(workspaceId);
     setLastSyncedAt(syncEngine.lastSyncedAt);
-  }, []);
+  }, [enableSync]);
 
   return (
     <SyncContext.Provider
