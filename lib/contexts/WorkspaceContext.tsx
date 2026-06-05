@@ -10,9 +10,10 @@ import {
 } from "react";
 import { createDatabase, isUsingMemoryStorage, type NotlyDatabase } from "@/lib/db";
 import type { WorkspaceDocType, PageDocType } from "@/lib/db/types";
-import { getWorkspaceById, createWorkspace } from "@/lib/db/repositories/workspace-repo";
+import { getWorkspaceById, createWorkspace, updateWorkspace } from "@/lib/db/repositories/workspace-repo";
 import { getPagesByWorkspace, createPage, updatePage, deletePage } from "@/lib/db/repositories/page-repo";
 import { BlockRepo } from "@/lib/db";
+import { useSync } from "./SyncContext";
 
 type WorkspaceContextValue = {
   db: NotlyDatabase | null;
@@ -25,6 +26,7 @@ type WorkspaceContextValue = {
   addNewPage: (parentId?: string, navigate?: boolean) => Promise<PageDocType | null>;
   updatePageProp: (pageId: string, props: Partial<PageDocType>) => Promise<void>;
   deletePageById: (pageId: string) => Promise<void>;
+  toggleWorkspaceOnline: () => Promise<void>;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextValue>({
@@ -38,6 +40,7 @@ const WorkspaceContext = createContext<WorkspaceContextValue>({
   addNewPage: async () => null,
   updatePageProp: async () => {},
   deletePageById: async () => {},
+  toggleWorkspaceOnline: async () => {},
 });
 
 export function useWorkspace() {
@@ -57,6 +60,7 @@ export function WorkspaceProvider({
   const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isMemory, setIsMemory] = useState(false);
+  const { syncWorkspace } = useSync();
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +74,7 @@ export function WorkspaceProvider({
 
         let ws = await getWorkspaceById(workspaceId);
         if (!ws) {
-          ws = await createWorkspace({ id: workspaceId, name: "Meu Workspace" });
+          ws = await createWorkspace({ id: workspaceId, name: "Meu Workspace", isOnline: false });
         }
         if (cancelled) return;
         setWorkspace(ws.toMutableJSON());
@@ -150,6 +154,16 @@ export function WorkspaceProvider({
     setPages((prev) => prev.map((p) => (p.id === pageId ? { ...p, ...props } : p)));
   }, []);
 
+  const toggleWorkspaceOnline = useCallback(async () => {
+    if (!workspace || !db) return;
+    const newState = !workspace.isOnline;
+    await updateWorkspace(workspace.id, { isOnline: newState });
+    setWorkspace((prev) => (prev ? { ...prev, isOnline: newState } : prev));
+    if (newState) {
+      await syncWorkspace(workspace.id);
+    }
+  }, [workspace, db, syncWorkspace]);
+
   const deletePageByIdFn = useCallback(async (pageId: string) => {
     await deletePage(pageId);
     setPages((prev) => {
@@ -174,6 +188,7 @@ export function WorkspaceProvider({
         addNewPage,
         updatePageProp: updatePagePropFn,
         deletePageById: deletePageByIdFn,
+        toggleWorkspaceOnline,
       }}
     >
       {children}

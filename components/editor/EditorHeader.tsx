@@ -29,10 +29,10 @@ export default function EditorHeader() {
     workspace,
     currentPageId,
     setCurrentPage,
-    isMemory,
     updatePageProp,
     deletePageById,
     addNewPage,
+    toggleWorkspaceOnline,
   } = useWorkspace();
   const { setSidebarOpen, setPanelOpen } = useLayout();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -215,14 +215,22 @@ export default function EditorHeader() {
           />
         </button>
 
-        <span className="hidden sm:flex items-center gap-1.5 text-xs text-on-surface-variant">
+        <button
+          onClick={toggleWorkspaceOnline}
+          className={`p-1.5 rounded-md transition-colors hidden sm:flex items-center gap-1.5 text-xs ${
+            workspace?.isOnline
+              ? "text-primary hover:text-primary/80"
+              : "text-on-surface-variant hover:text-primary"
+          }`}
+          title={workspace?.isOnline ? "Desativar sincronização" : "Ativar sincronização"}
+        >
           <Icon
-            icon={isMemory ? "basil:info-circle-outline" : "basil:cloud-outline"}
-            width={12}
-            height={12}
+            icon={workspace?.isOnline ? "basil:cloud-outline" : "basil:cloud-slash-outline"}
+            width={14}
+            height={14}
           />
-          {isMemory ? "Memória" : "Offline"}
-        </span>
+          {workspace?.isOnline ? "Online" : "Offline"}
+        </button>
 
         <button
           onClick={() => setPanelOpen(true)}

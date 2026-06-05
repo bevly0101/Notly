@@ -17,6 +17,7 @@ type SyncContextValue = {
   enableSync: () => Promise<void>;
   disableSync: () => void;
   syncNow: () => Promise<void>;
+  syncWorkspace: (workspaceId: string) => Promise<void>;
 };
 
 const SyncContext = createContext<SyncContextValue>({
@@ -27,6 +28,7 @@ const SyncContext = createContext<SyncContextValue>({
   enableSync: async () => {},
   disableSync: () => {},
   syncNow: async () => {},
+  syncWorkspace: async () => {},
 });
 
 export function useSync() {
@@ -70,7 +72,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     syncEngine.setDatabase(db);
     syncEngine.setSupabase(supabase);
 
-    await syncEngine.initialSync();
     await syncEngine.start();
 
     setIsEnabled(true);
@@ -90,9 +91,14 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     setLastSyncedAt(syncEngine.lastSyncedAt);
   }, []);
 
+  const syncWorkspace = useCallback(async (workspaceId: string) => {
+    await syncEngine.syncWorkspace(workspaceId);
+    setLastSyncedAt(syncEngine.lastSyncedAt);
+  }, []);
+
   return (
     <SyncContext.Provider
-      value={{ syncStatus, lastSyncedAt, isEnabled, initialSyncProgress, enableSync, disableSync, syncNow }}
+      value={{ syncStatus, lastSyncedAt, isEnabled, initialSyncProgress, enableSync, disableSync, syncNow, syncWorkspace }}
     >
       {children}
     </SyncContext.Provider>

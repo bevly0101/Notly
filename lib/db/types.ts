@@ -4,6 +4,7 @@ export type WorkspaceDocType = {
   id: string;
   name: string;
   icon: string | null;
+  isOnline: boolean;
   createdAt: number;
   updatedAt: number;
 };

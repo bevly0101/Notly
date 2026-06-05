@@ -66,6 +66,10 @@ async function tryCreate(
             oldDoc.icon = null;
             return oldDoc;
           },
+          2: (oldDoc: Record<string, unknown>) => {
+            oldDoc.isOnline = false;
+            return oldDoc;
+          },
         },
       },
       pages: {

@@ -22,6 +22,8 @@ export class SyncEngine {
   private _lastSyncedAt: number | null = null;
   private progressListeners = new Set<(p: InitialSyncProgress) => void>();
   private pushRetryQueue: PushChange[] = [];
+  private onlineWorkspaces = new Set<string>();
+  private workspacePageMap = new Map<string, string>();
 
   setDatabase(db: NotlyDatabase) {
     this.db = db;
@@ -62,6 +64,7 @@ export class SyncEngine {
     if (this.isRunning || !this.db || !this.supabase) return;
 
     this.setStatus("syncing");
+    await this.refreshOnlineWorkspaces();
     this.startPullWorker();
     this.observeChanges();
   }
@@ -79,19 +82,34 @@ export class SyncEngine {
     }
     this.changeBuffer = [];
     this.pushRetryQueue = [];
+    this.onlineWorkspaces.clear();
+    this.workspacePageMap.clear();
     this.setStatus("idle");
   }
 
-  async initialSync(): Promise<void> {
+  async initialSync(workspaceId?: string): Promise<void> {
     if (!this.db || !this.supabase) return;
 
     this.setStatus("initial-syncing");
 
-    const workspaces = await this.db.workspaces.find().exec();
-    const pages = await this.db.pages.find().exec();
-    const blocks = await this.db.blocks.find().exec();
+    const allWorkspaces = await this.db.workspaces.find().exec();
+    const wsFilter = workspaceId ? allWorkspaces.filter((w) => w.id === workspaceId) : allWorkspaces;
 
-    const total = workspaces.length + pages.length + blocks.length;
+    const pageFilter = workspaceId
+      ? await this.db.pages.find().where("workspaceId").equals(workspaceId).exec()
+      : await this.db.pages.find().exec();
+
+    const allPages = pageFilter;
+
+    const blockFilter = workspaceId
+      ? await this.db.blocks.find().where("pageId").in(
+          allPages.map((p) => p.id),
+        ).exec()
+      : await this.db.blocks.find().exec();
+
+    const allBlocks = blockFilter;
+
+    const total = wsFilter.length + allPages.length + allBlocks.length;
     let current = 0;
 
     const report = () => {
@@ -100,15 +118,19 @@ export class SyncEngine {
     };
 
     try {
-      for (const ws of workspaces) {
+      for (const ws of wsFilter) {
+        if (!ws.isOnline) continue;
         await this.pushCreate("workspaces", ws.toJSON());
         report();
       }
-      for (const pg of pages) {
+      for (const pg of allPages) {
+        if (!this.isWorkspaceOnline(pg.workspaceId)) continue;
         await this.pushCreate("pages", pg.toJSON());
         report();
       }
-      for (const bl of blocks) {
+      for (const bl of allBlocks) {
+        const pageDoc = allPages.find((p) => p.id === bl.pageId);
+        if (!pageDoc || !this.isWorkspaceOnline(pageDoc.workspaceId)) continue;
         await this.pushCreate("blocks", bl.toJSON());
         report();
       }
@@ -118,6 +140,9 @@ export class SyncEngine {
       return;
     }
 
+    await pullChanges(this.supabase, this.db);
+
+    await this.refreshOnlineWorkspaces();
     this._lastSyncedAt = Date.now();
     this.setStatus("synced");
   }
@@ -129,13 +154,94 @@ export class SyncEngine {
     await this.flushChanges();
     await pullChanges(this.supabase, this.db);
 
+    await this.refreshOnlineWorkspaces();
     this._lastSyncedAt = Date.now();
     if (this.pushRetryQueue.length === 0) {
       this.setStatus("synced");
     }
   }
 
+  async syncWorkspace(workspaceId: string): Promise<void> {
+    if (!this.db || !this.supabase) return;
+
+    this.setStatus("syncing");
+
+    const ws = await this.db.workspaces.findOne(workspaceId).exec();
+    if (!ws || !ws.isOnline) return;
+
+    try {
+      await this.pushCreate("workspaces", ws.toJSON());
+
+      const pages = await this.db.pages.find().where("workspaceId").equals(workspaceId).exec();
+      for (const pg of pages) {
+        await this.pushCreate("pages", pg.toJSON());
+      }
+
+      const pageIds = pages.map((p) => p.id);
+      if (pageIds.length > 0) {
+        const blocks = await this.db.blocks.find().where("pageId").in(pageIds).exec();
+        for (const bl of blocks) {
+          await this.pushCreate("blocks", bl.toJSON());
+        }
+      }
+
+      await pullChanges(this.supabase, this.db);
+    } catch (err) {
+      console.error(`[Sync] syncWorkspace ${workspaceId} failed:`, err);
+      this.setStatus("error");
+      return;
+    }
+
+    await this.refreshOnlineWorkspaces();
+    this._lastSyncedAt = Date.now();
+    this.setStatus("synced");
+  }
+
+  async refreshOnlineWorkspaces(): Promise<void> {
+    if (!this.db) return;
+    try {
+      const all = await this.db.workspaces.find().exec();
+      this.onlineWorkspaces.clear();
+      this.workspacePageMap.clear();
+      for (const ws of all) {
+        if (ws.isOnline) {
+          this.onlineWorkspaces.add(ws.id);
+        }
+      }
+      const allPages = await this.db.pages.find().exec();
+      for (const p of allPages) {
+        this.workspacePageMap.set(p.id, p.workspaceId);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  isWorkspaceOnline(workspaceId: string): boolean {
+    return this.onlineWorkspaces.has(workspaceId);
+  }
+
   /* ---------- private ---------- */
+
+  private async getWorkspaceIdForDoc(collection: SyncCollection, doc: Record<string, unknown>): Promise<string | null> {
+    if (collection === "workspaces") return (doc.id as string) ?? null;
+    if (collection === "pages") return (doc.workspaceId as string) ?? null;
+    if (collection === "blocks") {
+      const pageId = doc.pageId as string;
+      if (this.workspacePageMap.has(pageId)) return this.workspacePageMap.get(pageId) ?? null;
+      if (!this.db) return null;
+      try {
+        const page = await this.db.pages.findOne(pageId).exec();
+        if (page) {
+          this.workspacePageMap.set(pageId, page.workspaceId);
+          return page.workspaceId;
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 
   private observeChanges() {
     if (!this.db) return;
@@ -148,7 +254,7 @@ export class SyncEngine {
 
     for (const { name, col } of collections) {
       const collection = col as {
-        insert$: { subscribe: (fn: (ev: { documentId: string; doc: Record<string, unknown> }) => void) => Unsubscribe };
+        insert$: { subscribe: (fn: (ev: { documentId: string }) => void) => Unsubscribe };
         update$: { subscribe: (fn: (ev: { documentId: string }) => void) => Unsubscribe };
         remove$: { subscribe: (fn: (ev: { documentId: string; previousData: Record<string, unknown> }) => void) => Unsubscribe };
         findOne: (id: string) => { exec: () => Promise<{ toJSON: () => Record<string, unknown> } | null> };
@@ -158,14 +264,20 @@ export class SyncEngine {
         if (this._isPulling) return;
         const freshDoc = await collection.findOne(ev.documentId).exec();
         if (!freshDoc) return;
-        this.enqueue({ collection: name, operation: "create", id: ev.documentId, doc: freshDoc.toJSON() });
+        const doc = freshDoc.toJSON();
+        const wsId = await this.getWorkspaceIdForDoc(name, doc);
+        if (!wsId || !this.onlineWorkspaces.has(wsId)) return;
+        this.enqueue({ collection: name, operation: "create", id: ev.documentId, doc });
       });
 
       const updateSub = collection.update$.subscribe(async (ev) => {
         if (this._isPulling) return;
         const doc = await collection.findOne(ev.documentId).exec();
         if (!doc) return;
-        this.enqueue({ collection: name, operation: "update", id: ev.documentId, doc: doc.toJSON() });
+        const json = doc.toJSON();
+        const wsId = await this.getWorkspaceIdForDoc(name, json);
+        if (!wsId || !this.onlineWorkspaces.has(wsId)) return;
+        this.enqueue({ collection: name, operation: "update", id: ev.documentId, doc: json });
       });
 
       const removeSub = collection.remove$.subscribe((ev) => {
@@ -210,7 +322,6 @@ export class SyncEngine {
       }
       if (!success) {
         allSucceeded = false;
-        break;
       }
     }
 
@@ -255,7 +366,7 @@ export class SyncEngine {
           p_id: doc.id,
           p_name: doc.name ?? "",
           p_icon: doc.icon ?? null,
-          p_metadata: {},
+          p_metadata: { is_online: doc.isOnline ?? false },
         });
         break;
       case "pages":
@@ -291,7 +402,7 @@ export class SyncEngine {
           p_id: doc.id,
           p_name: doc.name ?? null,
           p_icon: doc.icon ?? null,
-          p_metadata: null,
+          p_metadata: { is_online: doc.isOnline ?? false },
         });
         break;
       case "pages":

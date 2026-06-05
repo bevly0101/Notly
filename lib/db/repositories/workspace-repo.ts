@@ -27,6 +27,7 @@ export async function createWorkspace(
     id: uuidv4(),
     name: "Meu Workspace",
     icon: null,
+    isOnline: false,
     createdAt: now,
     updatedAt: now,
     ...data,

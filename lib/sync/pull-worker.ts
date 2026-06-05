@@ -24,12 +24,23 @@ function snakeToCamel(str: string): string {
 }
 
 function mapCloudDoc(table: string, doc: Record<string, unknown>): Record<string, unknown> {
+  let isOnline = false;
+  const meta = doc.metadata as Record<string, unknown> | undefined;
+  if (meta && typeof meta.is_online === "boolean") {
+    isOnline = meta.is_online;
+  }
+
   const mapped: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
     if (key === "user_id" || key === "deleted_at" || key === "path" || key === "metadata") continue;
     const camel = snakeToCamel(key);
     mapped[camel] = value;
   }
+
+  if (table === "workspaces") {
+    mapped.isOnline = isOnline;
+  }
+
   if (mapped.createdAt) mapped.createdAt = new Date(mapped.createdAt as string).getTime();
   if (mapped.updatedAt) mapped.updatedAt = new Date(mapped.updatedAt as string).getTime();
   return mapped;
@@ -48,6 +59,19 @@ type SyncPullResult = {
   blocks: Record<string, unknown>[];
   deleted: { table_name: string; record_id: string }[];
 };
+
+async function getOnlineWorkspaceIds(db: NotlyDatabase): Promise<Set<string>> {
+  const online = new Set<string>();
+  try {
+    const all = await db.workspaces.find().exec();
+    for (const ws of all) {
+      if (ws.isOnline) online.add(ws.id);
+    }
+  } catch {
+    /* ignore */
+  }
+  return online;
+}
 
 export async function pullChanges(
   supabase: SupabaseClient,
@@ -68,6 +92,19 @@ export async function pullChanges(
   const result = data as unknown as SyncPullResult;
   if (!result) return 0;
 
+  const onlineWorkspaces = await getOnlineWorkspaceIds(db);
+
+  // Build pageId → workspaceId map from local data
+  const pageWsMap = new Map<string, string>();
+  try {
+    const allPages = await db.pages.find().exec();
+    for (const p of allPages) {
+      pageWsMap.set(p.id, p.workspaceId);
+    }
+  } catch {
+    /* ignore */
+  }
+
   let processed = 0;
 
   // Process active documents
@@ -82,6 +119,17 @@ export async function pullChanges(
 
     for (const cloudDoc of docs) {
       try {
+        // Filter by workspace online status
+        if (table === "pages") {
+          const wsId = cloudDoc.workspace_id as string;
+          if (!wsId || !onlineWorkspaces.has(wsId)) continue;
+        }
+        if (table === "blocks") {
+          const pageId = cloudDoc.page_id as string;
+          const wsId = pageWsMap.get(pageId);
+          if (!wsId || !onlineWorkspaces.has(wsId)) continue;
+        }
+
         const rid = cloudDoc.id as string;
         const existing = await collection.findOne(rid).exec();
 
