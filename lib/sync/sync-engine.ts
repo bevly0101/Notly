@@ -154,9 +154,11 @@ export class SyncEngine {
         findOne: (id: string) => { exec: () => Promise<{ toJSON: () => Record<string, unknown> } | null> };
       };
 
-      const insertSub = collection.insert$.subscribe((ev) => {
+      const insertSub = collection.insert$.subscribe(async (ev) => {
         if (this._isPulling) return;
-        this.enqueue({ collection: name, operation: "create", id: ev.documentId, doc: ev.doc });
+        const freshDoc = await collection.findOne(ev.documentId).exec();
+        if (!freshDoc) return;
+        this.enqueue({ collection: name, operation: "create", id: ev.documentId, doc: freshDoc.toJSON() });
       });
 
       const updateSub = collection.update$.subscribe(async (ev) => {
