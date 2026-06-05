@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/contexts/AuthContext";
+import { SyncProvider } from "@/lib/contexts/SyncContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="pt" className={`${inter.variable} ${jetbrainsMono.variable} h-full`}>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+            <SyncProvider>{children}</SyncProvider>
+          </AuthProvider>
       </body>
     </html>
   );

@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
 import IATab from "./IATab";
+import SyncTab from "./SyncTab";
 
 const TABS = [
+  { id: "sync", label: "Sincronização" },
   { id: "ia", label: "IA" },
 ] as const;
 
@@ -48,6 +50,7 @@ export default function SettingsPage() {
         </nav>
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          {activeTab === "sync" && <SyncTab />}
           {activeTab === "ia" && <IATab />}
         </main>
       </div>
