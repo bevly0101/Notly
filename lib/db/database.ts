@@ -7,7 +7,8 @@ import { wrappedValidateAjvStorage } from "rxdb/plugins/validate-ajv";
 import { WORKSPACE_SCHEMA } from "./schemas/workspace";
 import { PAGE_SCHEMA } from "./schemas/page";
 import { BLOCK_SCHEMA } from "./schemas/block";
-import type { WorkspaceCollection, PageCollection, BlockCollection } from "./types";
+import { API_KEY_SCHEMA } from "./schemas/api-key";
+import type { WorkspaceCollection, PageCollection, BlockCollection, ApiKeyCollection } from "./types";
 
 addRxPlugin(RxDBDevModePlugin);
 addRxPlugin(RxDBMigrationSchemaPlugin);
@@ -16,6 +17,7 @@ type NotlyCollections = {
   workspaces: WorkspaceCollection;
   pages: PageCollection;
   blocks: BlockCollection;
+  api_keys: ApiKeyCollection;
 };
 
 export type NotlyDatabase = RxDatabase<NotlyCollections>;
@@ -71,6 +73,9 @@ async function tryCreate(
       },
       blocks: {
         schema: BLOCK_SCHEMA,
+      },
+      api_keys: {
+        schema: API_KEY_SCHEMA,
       },
     }),
     4000,

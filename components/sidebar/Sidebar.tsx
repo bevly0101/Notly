@@ -6,6 +6,7 @@ import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 import { useLayout } from "@/lib/contexts/LayoutContext";
 import type { PageDocType } from "@/lib/db/types";
 import AppIcon from "@/components/ui/AppIcon";
+import Link from "next/link";
 
 export default function Sidebar() {
   const {
@@ -128,6 +129,14 @@ export default function Sidebar() {
           <span className="text-base">+</span>
           <span>Nova página</span>
         </button>
+
+        <Link
+          href="/settings"
+          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm text-on-surface hover:bg-surface-container-high transition-colors"
+        >
+          <Icon icon="basil:settings-outline" width={14} height={14} />
+          <span>Configurações</span>
+        </Link>
 
         <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-on-surface-variant">
           <span className={`inline-block w-1.5 h-1.5 rounded-full ${isMemory ? "bg-secondary" : "bg-on-surface-variant"}`} />

@@ -33,10 +33,23 @@ export type BlockDocType = {
   updatedAt: number;
 };
 
+export type ApiKeyDocType = {
+  id: string;
+  provider: string;
+  label: string;
+  encryptedKey: string;
+  model: string;
+  temperature: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
 export type WorkspaceDocument = RxDocument<WorkspaceDocType>;
 export type PageDocument = RxDocument<PageDocType>;
 export type BlockDocument = RxDocument<BlockDocType>;
+export type ApiKeyDocument = RxDocument<ApiKeyDocType>;
 
 export type WorkspaceCollection = RxCollection<WorkspaceDocType>;
 export type PageCollection = RxCollection<PageDocType>;
 export type BlockCollection = RxCollection<BlockDocType>;
+export type ApiKeyCollection = RxCollection<ApiKeyDocType>;
