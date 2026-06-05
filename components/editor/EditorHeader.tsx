@@ -178,7 +178,7 @@ export default function EditorHeader() {
             onClick={() => setMenuOpen(!menuOpen)}
             className="p-1.5 rounded-md text-on-surface-variant hover:text-primary hover:bg-surface-container transition-colors"
           >
-            <Icon icon="basil:more-outline" width={16} height={16} />
+            <Icon icon="basil:other-1-outline" width={16} height={16} />
           </button>
           {menuOpen && (
             <>

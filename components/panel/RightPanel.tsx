@@ -52,7 +52,7 @@ export default function RightPanel() {
           className="px-2 py-2 text-on-surface-variant hover:text-primary transition-colors"
           title="Fechar painel"
         >
-          <Icon icon="basil:close-outline" width={14} height={14} />
+          <Icon icon="basil:cross-outline" width={14} height={14} />
         </button>
       </div>
 
