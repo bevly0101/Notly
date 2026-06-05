@@ -188,6 +188,7 @@ export class SyncEngine {
     if (batch.length === 0) return;
 
     this.setStatus("syncing");
+    let allSucceeded = true;
 
     for (const change of batch) {
       let success = false;
@@ -205,7 +206,17 @@ export class SyncEngine {
           }
         }
       }
-      if (!success) break;
+      if (!success) {
+        allSucceeded = false;
+        break;
+      }
+    }
+
+    if (allSucceeded && this.pushRetryQueue.length === 0) {
+      this._lastSyncedAt = Date.now();
+      this.setStatus("synced");
+    } else {
+      this.setStatus("error");
     }
   }
 
@@ -225,12 +236,20 @@ export class SyncEngine {
     }
   }
 
-  private async pushCreate(collection: SyncCollection, doc: Record<string, unknown>) {
+  private async callRpc(name: string, args: Record<string, unknown>): Promise<void> {
     if (!this.supabase) return;
 
+    const { error } = await this.supabase.rpc(name, args);
+
+    if (error) {
+      throw new Error(`RPC ${name} falhou: ${error.message}`);
+    }
+  }
+
+  private async pushCreate(collection: SyncCollection, doc: Record<string, unknown>) {
     switch (collection) {
       case "workspaces":
-        await this.supabase.rpc("workspace_create", {
+        await this.callRpc("workspace_create", {
           p_id: doc.id,
           p_name: doc.name ?? "",
           p_icon: doc.icon ?? null,
@@ -238,7 +257,7 @@ export class SyncEngine {
         });
         break;
       case "pages":
-        await this.supabase.rpc("page_create", {
+        await this.callRpc("page_create", {
           p_id: doc.id,
           p_workspace_id: doc.workspaceId,
           p_parent_id: doc.parentId ?? null,
@@ -249,7 +268,7 @@ export class SyncEngine {
         });
         break;
       case "blocks":
-        await this.supabase.rpc("block_create", {
+        await this.callRpc("block_create", {
           p_id: doc.id,
           p_page_id: doc.pageId,
           p_type: doc.type ?? "paragraph",
@@ -264,11 +283,9 @@ export class SyncEngine {
   }
 
   private async pushUpdate(collection: SyncCollection, doc: Record<string, unknown>) {
-    if (!this.supabase) return;
-
     switch (collection) {
       case "workspaces":
-        await this.supabase.rpc("workspace_update", {
+        await this.callRpc("workspace_update", {
           p_id: doc.id,
           p_name: doc.name ?? null,
           p_icon: doc.icon ?? null,
@@ -276,7 +293,7 @@ export class SyncEngine {
         });
         break;
       case "pages":
-        await this.supabase.rpc("page_update", {
+        await this.callRpc("page_update", {
           p_id: doc.id,
           p_title: doc.title ?? null,
           p_icon: doc.icon ?? null,
@@ -288,7 +305,7 @@ export class SyncEngine {
         });
         break;
       case "blocks":
-        await this.supabase.rpc("block_update", {
+        await this.callRpc("block_update", {
           p_id: doc.id,
           p_type: doc.type ?? null,
           p_content: doc.content ?? null,
@@ -302,17 +319,15 @@ export class SyncEngine {
   }
 
   private async pushDelete(collection: SyncCollection, id: string) {
-    if (!this.supabase) return;
-
     switch (collection) {
       case "workspaces":
-        await this.supabase.rpc("workspace_delete", { p_id: id });
+        await this.callRpc("workspace_delete", { p_id: id });
         break;
       case "pages":
-        await this.supabase.rpc("page_delete", { p_id: id });
+        await this.callRpc("page_delete", { p_id: id });
         break;
       case "blocks":
-        await this.supabase.rpc("block_delete", { p_id: id });
+        await this.callRpc("block_delete", { p_id: id });
         break;
     }
   }
