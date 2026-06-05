@@ -189,6 +189,12 @@ export default function Editor() {
         }
         return false;
       },
+      handleDOMEvents: {
+        contextmenu: (_, event) => {
+          event.preventDefault();
+          return true;
+        },
+      },
     },
   });
 
