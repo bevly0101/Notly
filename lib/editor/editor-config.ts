@@ -5,6 +5,9 @@ import TaskItem from "@tiptap/extension-task-item";
 import Link from "@tiptap/extension-link";
 import Highlight from "@tiptap/extension-highlight";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import Underline from "@tiptap/extension-underline";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
 import { common, createLowlight } from "lowlight";
 import { PageReference } from "./page-reference";
 
@@ -37,6 +40,9 @@ export function getEditorExtensions() {
     CodeBlockLowlight.configure({
       lowlight,
     }),
+    TextStyle,
+    Color,
+    Underline,
     PageReference,
   ];
 }

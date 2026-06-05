@@ -8,6 +8,7 @@ import type { PageReferenceAttrs } from "@/lib/editor/page-reference";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 import { BlockRepo } from "@/lib/db";
 import SlashCommandMenu from "./SlashCommandMenu";
+import FormatBubbleMenu from "./FormatBubbleMenu";
 import "./editor-styles.css";
 
 export default function Editor() {
@@ -253,6 +254,7 @@ export default function Editor() {
     <div className="flex-1 flex">
       <div className="flex-1 px-4 sm:px-8 py-4 sm:py-6 max-w-[840px] mx-auto w-full">
         <EditorContent editor={editor} />
+        {editor && <FormatBubbleMenu editor={editor} />}
         {slashOpen && editor && (
           <SlashCommandMenu
             editor={editor}
