@@ -20,6 +20,7 @@ export default function Editor() {
   const slashCharPos = useRef<number | null>(null);
   const pageIdRef = useRef<string | null>(null);
   const lastTitleRef = useRef<string>("");
+  const isLoadingRef = useRef(false);
 
   useEffect(() => {
     pageIdRef.current = currentPageId;
@@ -117,6 +118,7 @@ export default function Editor() {
       ],
     },
     onUpdate({ editor: ed }) {
+      if (isLoadingRef.current) return;
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -210,6 +212,7 @@ export default function Editor() {
     let cancelled = false;
 
     async function loadContent() {
+      isLoadingRef.current = true;
       try {
         const blocks = await BlockRepo.getBlocksByPage(pid);
         if (cancelled) return;
@@ -231,6 +234,8 @@ export default function Editor() {
         }
       } catch (err) {
         console.error("Failed to load editor content:", err);
+      } finally {
+        isLoadingRef.current = false;
       }
     }
     loadContent();

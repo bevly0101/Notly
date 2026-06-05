@@ -1,11 +1,25 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, RealtimeChannel } from "@supabase/supabase-js";
 import type { NotlyDatabase } from "@/lib/db/database";
 import type { SyncStatus, PushChange, SyncCollection, InitialSyncProgress } from "./types";
-import { pullChanges } from "./pull-worker";
+import { pullChanges, mapCloudDoc } from "./pull-worker";
 
 const DEBOUNCE_MS = 1000;
 const PULL_INTERVAL_MS = 30000;
 const MAX_RETRIES = 3;
+
+function getOrCreateDeviceId(): string {
+  const KEY = "notly_device_id";
+  try {
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
 
 type Unsubscribe = () => void;
 
@@ -24,6 +38,9 @@ export class SyncEngine {
   private pushRetryQueue: PushChange[] = [];
   private onlineWorkspaces = new Set<string>();
   private workspacePageMap = new Map<string, string>();
+  private deviceId = getOrCreateDeviceId();
+  private _applyingRealtime = false;
+  private realtimeChannels: RealtimeChannel[] = [];
 
   setDatabase(db: NotlyDatabase) {
     this.db = db;
@@ -67,6 +84,7 @@ export class SyncEngine {
     await this.refreshOnlineWorkspaces();
     this.startPullWorker();
     this.observeChanges();
+    this.subscribeRealtime();
   }
 
   stop() {
@@ -80,10 +98,15 @@ export class SyncEngine {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
+    for (const ch of this.realtimeChannels) {
+      ch.unsubscribe();
+    }
+    this.realtimeChannels = [];
     this.changeBuffer = [];
     this.pushRetryQueue = [];
     this.onlineWorkspaces.clear();
     this.workspacePageMap.clear();
+    this._applyingRealtime = false;
     this.setStatus("idle");
   }
 
@@ -288,6 +311,7 @@ export class SyncEngine {
   }
 
   private enqueue(change: PushChange) {
+    if (this._applyingRealtime) return;
     this.changeBuffer = this.changeBuffer.filter((c) => !(c.collection === change.collection && c.id === change.id));
     this.changeBuffer.push(change);
 
@@ -372,7 +396,7 @@ export class SyncEngine {
           p_id: doc.id,
           p_name: doc.name ?? "",
           p_icon: doc.icon ?? null,
-          p_metadata: { is_online: doc.isOnline ?? false },
+          p_metadata: { is_online: doc.isOnline ?? false, device_id: this.deviceId },
         });
         break;
       case "pages":
@@ -383,7 +407,7 @@ export class SyncEngine {
           p_title: doc.title ?? "Sem título",
           p_icon: doc.icon ?? null,
           p_sort_order: doc.sortOrder ?? 0,
-          p_metadata: {},
+          p_metadata: { device_id: this.deviceId },
         });
         break;
       case "blocks":
@@ -395,7 +419,7 @@ export class SyncEngine {
           p_attrs: doc.attrs ?? null,
           p_parent_id: doc.parentId ?? null,
           p_sort_order: doc.sortOrder ?? 0,
-          p_metadata: {},
+          p_metadata: { device_id: this.deviceId },
         });
         break;
     }
@@ -408,7 +432,7 @@ export class SyncEngine {
           p_id: doc.id,
           p_name: doc.name ?? null,
           p_icon: doc.icon ?? null,
-          p_metadata: { is_online: doc.isOnline ?? false },
+          p_metadata: { is_online: doc.isOnline ?? false, device_id: this.deviceId },
         });
         break;
       case "pages":
@@ -420,7 +444,7 @@ export class SyncEngine {
           p_is_favorite: doc.isFavorite ?? null,
           p_sort_order: doc.sortOrder ?? null,
           p_parent_id: doc.parentId ?? null,
-          p_metadata: null,
+          p_metadata: { device_id: this.deviceId },
         });
         break;
       case "blocks":
@@ -431,7 +455,7 @@ export class SyncEngine {
           p_attrs: doc.attrs ?? null,
           p_sort_order: doc.sortOrder ?? null,
           p_parent_id: doc.parentId ?? null,
-          p_metadata: null,
+          p_metadata: { device_id: this.deviceId },
         });
         break;
     }
@@ -448,6 +472,101 @@ export class SyncEngine {
       case "blocks":
         await this.callRpc("block_delete", { p_id: id });
         break;
+    }
+  }
+
+  private subscribeRealtime() {
+    if (!this.supabase) return;
+
+    const tables = ["workspaces", "pages", "blocks"] as const;
+
+    for (const table of tables) {
+      const channel = this.supabase
+        .channel(`notly-${table}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table },
+          (payload) => this.handleRealtime(table, payload),
+        )
+        .subscribe();
+
+      this.realtimeChannels.push(channel);
+    }
+  }
+
+  private async handleRealtime(
+    table: string,
+    payload: {
+      eventType: "INSERT" | "UPDATE" | "DELETE";
+      new: Record<string, unknown>;
+      old: Record<string, unknown>;
+    },
+  ) {
+    if (!this.db || this._applyingRealtime) return;
+
+    const eventType = payload.eventType;
+    const record = payload.new;
+    const oldRecord = payload.old;
+
+    // Skip our own changes: device_id in metadata matches ours
+    const meta = (record.metadata ?? oldRecord.metadata) as Record<string, unknown> | undefined;
+    const sourceDevice = meta?.device_id as string | undefined;
+    if (sourceDevice === this.deviceId) return;
+
+    // Map table name to RxDB collection name
+    const collectionName = table === "workspaces" ? "workspaces" : table === "pages" ? "pages" : table === "blocks" ? "blocks" : null;
+    if (!collectionName) return;
+
+    const collection = this.db[collectionName] as unknown as {
+      findOne: (id: string) => {
+        exec: () => Promise<{
+          toJSON: () => Record<string, unknown>;
+          patch: (patch: Record<string, unknown>) => Promise<void>;
+          remove: () => Promise<void>;
+        } | null>;
+      };
+      insert: (doc: Record<string, unknown>) => Promise<unknown>;
+    };
+    if (!collection) return;
+
+    this._applyingRealtime = true;
+
+    try {
+      if (eventType === "DELETE") {
+        const id = (oldRecord.id ?? record.id) as string;
+        const existing = await collection.findOne(id).exec();
+        if (existing) {
+          await existing.remove();
+        }
+        return;
+      }
+
+      const mapped = mapCloudDoc(table, record);
+      const rid = mapped.id as string;
+      if (!rid) return;
+
+      // Filter by online workspace
+      const wsId: string | undefined =
+        table === "workspaces" ? rid : (mapped.workspaceId as string | undefined);
+      if (!wsId || !this.onlineWorkspaces.has(wsId)) return;
+
+      const existing = await collection.findOne(rid).exec();
+
+      if (existing) {
+        const cloudUpdated = mapped.updatedAt as number;
+        const localUpdated = (existing.toJSON() as Record<string, unknown>).updatedAt as number ?? 0;
+        if (cloudUpdated > localUpdated) {
+          const patch = { ...mapped };
+          delete (patch as Record<string, unknown>).id;
+          await existing.patch(patch);
+        }
+      } else {
+        await collection.insert(mapped);
+      }
+    } catch (err) {
+      console.error(`[Sync] Realtime error processing ${table}/${record.id}:`, err);
+    } finally {
+      this._applyingRealtime = false;
     }
   }
 

@@ -19,11 +19,11 @@ function setLastSyncTimestamp(ts: number) {
   } catch {}
 }
 
-function snakeToCamel(str: string): string {
+export function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
 
-function mapCloudDoc(table: string, doc: Record<string, unknown>): Record<string, unknown> {
+export function mapCloudDoc(table: string, doc: Record<string, unknown>): Record<string, unknown> {
   let isOnline = false;
   const meta = doc.metadata as Record<string, unknown> | undefined;
   if (meta && typeof meta.is_online === "boolean") {
