@@ -26,7 +26,7 @@ function snakeToCamel(str: string): string {
 function mapCloudDoc(table: string, doc: Record<string, unknown>): Record<string, unknown> {
   const mapped: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
-    if (key === "user_id" || key === "deleted_at" || key === "path") continue;
+    if (key === "user_id" || key === "deleted_at" || key === "path" || key === "metadata") continue;
     const camel = snakeToCamel(key);
     mapped[camel] = value;
   }
