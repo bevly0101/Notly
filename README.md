@@ -5,6 +5,9 @@
 </p>
 
 <p align="center">
+  <a align="center" href="https://notly-rho.vercel.app">VISITAR APP BETA </a>
+</p>
+<p align="center">
   <strong>Uma alternativa "local-first" ao Notion, focada em privacidade, performance e liberdade total.</strong>
 </p>
 
