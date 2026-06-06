@@ -1,27 +1,148 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@layer base {
+  body {
+    @apply bg-background text-on-background font-sans antialiased;
+  }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  .material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    vertical-align: middle;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .glass-panel {
+    background: rgba(28, 27, 27, 0.7);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-card {
+    background: rgba(28, 27, 27, 0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(32, 31, 31, 0.85);
+    transform: translateY(-2px);
+  }
+
+  .mesh-bg {
+    background-color: #131313;
+    background-image:
+      radial-gradient(at 0% 0%, hsla(220, 100%, 15%, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(220, 100%, 10%, 0.05) 0px, transparent 50%);
+  }
+
+  .inner-glow {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-active {
+    background: rgba(58, 57, 57, 0.8);
+    border-left: 2px solid #adc6ff;
+  }
+
+  .slash-menu {
+    box-shadow:
+      0 10px 40px -10px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .ProseMirror {
+    @apply outline-none min-h-[200px];
+  }
+
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply text-on-surface-variant float-left h-0 pointer-events-none;
+  }
+
+  .ProseMirror h1 {
+    @apply text-display-lg font-bold text-primary mb-4;
+  }
+
+  .ProseMirror h2 {
+    @apply text-headline-md font-semibold text-primary mb-3;
+  }
+
+  .ProseMirror h3 {
+    @apply text-body-base font-semibold text-primary mb-2;
+  }
+
+  .ProseMirror ul {
+    @apply list-disc pl-6 space-y-1;
+  }
+
+  .ProseMirror ol {
+    @apply list-decimal pl-6 space-y-1;
+  }
+
+  .ProseMirror blockquote {
+    @apply border-l-2 border-secondary pl-4 text-on-surface-variant italic;
+  }
+
+  .ProseMirror hr {
+    @apply border-outline-variant my-6;
+  }
+
+  .ProseMirror ul[data-type="taskList"] {
+    @apply list-none pl-0;
+  }
+
+  .ProseMirror ul[data-type="taskList"] li {
+    @apply flex items-start gap-2;
+  }
+
+  .ProseMirror ul[data-type="taskList"] li > label {
+    @apply flex items-start gap-2;
+  }
+
+  .sync-led-synced {
+    @apply bg-secondary-container animate-pulse;
+  }
+
+  .sync-led-offline {
+    @apply bg-outline-variant;
+  }
+
+  .sync-led-syncing {
+    @apply bg-secondary animate-pulse;
+  }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #353534;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444748;
 }
